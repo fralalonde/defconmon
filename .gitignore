@@ -1,4 +1,5 @@
 target/
-target-debian/
+target-*/
 .idea/
 *.ppm
+.defconmon-gif/

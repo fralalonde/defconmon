@@ -107,8 +107,8 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     cv.text(&f.a3270, 30.0, cx, my, GD, 230, "GAMES:");
     let sel = ((t / 1.5) as usize) % GAMES.len();
     let col_x = [cx + 40.0, cx + 760.0];
-    let rows = (GAMES.len() + 1) / 2;
-    for i in 0..GAMES.len() {
+    let rows = GAMES.len().div_ceil(2);
+    for (i, game) in GAMES.iter().enumerate() {
         let c = i / rows;
         let r = i % rows;
         let x = col_x[c.min(1)];
@@ -116,7 +116,7 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
         let is_sel = i == sel;
         let rgb = if is_sel { if blink { 0xffffff } else { AMBER } } else { G };
         let mark = if is_sel { ">" } else { " " };
-        let label = format!("{mark} {}. {}", i + 1, GAMES[i]);
+        let label = format!("{mark} {}. {game}", i + 1);
         cv.text(&f.a3270, 28.0, x, yy, rgb, if is_sel { 255 } else { 210 }, &label);
     }
     let gsel = format!("GAME SELECTED: {}", GAMES[sel]);

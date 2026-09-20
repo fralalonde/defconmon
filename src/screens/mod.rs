@@ -94,9 +94,8 @@ pub fn all_params() -> Vec<Param> {
 ///   2. the persistent status plate (so every screen reports the house state),
 ///   3. the CRT finish over both, so the plate reads as part of the glass.
 pub fn render(name: &str, cv: &mut Canvas, env: &Env, t: f32) {
-    match find(name).or_else(|| SCREENS.first()) {
-        Some(s) => (s.render)(cv, env, t),
-        None => {}
+    if let Some(s) = find(name).or_else(|| SCREENS.first()) {
+        (s.render)(cv, env, t);
     }
     if env.cfg.b("hud.visible", true) {
         hud::draw(cv, env.f, name, env.snap);

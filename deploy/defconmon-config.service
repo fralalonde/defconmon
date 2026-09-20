@@ -1,6 +1,6 @@
 [Unit]
 Description=defconmon config server (HTTP, LAN only)
-Documentation=file:/var/home/fralalonde/Code/INFRA/dashboard-retro/README.md
+Documentation=file:/var/home/fralalonde/Code/INFRA/defconmon/README.md
 After=network.target
 
 [Service]

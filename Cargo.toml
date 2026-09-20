@@ -1,0 +1,76 @@
+[package]
+name = "defconmon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tiny-skia = "0.11"
+ab_glyph = "0.2"
+serde_json = "1"
+# for localtime_r: the dashboard shows a wall clock, so it must respect TZ/DST
+libc = "0.2"
+
+# Live path: pure-Rust Wayland backend (no libwayland, no xkbcommon) so the
+# binary stays static-musl and dependency-free on the container.
+wayland-client = { version = "0.31", default-features = false, optional = true }
+wayland-protocols = { version = "0.32", default-features = false, features = ["client"], optional = true }
+memmap2 = { version = "0.9", optional = true }
+
+# GPU present path. wgpu loads EGL via dlopen at runtime, so it is a *runtime*
+# dependency that may be absent - the CPU path is the fallback. Kept behind its
+# own `gpu` feature so the plain `live` build never links wgpu: the CPU-only
+# display stays a small, dependency-free binary (~2 MB) and the GPU one is only
+# built when explicitly asked. The GPU display binary is a dynamic glibc build
+# (built in a Debian-12 container, not the static-musl form): EGL needs a real
+# wl_display/wl_surface, which the pure-Rust Wayland backend does not have.
+wgpu = { version = "30", default-features = false, features = ["gles", "wgsl"], optional = true }
+pollster = { version = "0.4", optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+
+[features]
+default = []
+# `system` gives the C libwayland backend, which is what exposes the raw
+# wl_display pointer EGL needs. Preview/bench builds don't enable it.
+#
+# Deliberately does NOT pull wgpu: `gpu` is a separate feature so the two build
+# flavours are real (CPU-only vs GPU present). Combine `live,gpu` for the full
+# display.
+live = [
+    "dep:wayland-client",
+    "dep:wayland-protocols",
+    "dep:memmap2",
+    "wayland-client/system",
+]
+# GPU present path: wgpu/EGL does the upscale and the whole CRT finish. Orthogonal
+# to `live` - add it on top for a display build, or drop it for the lean CPU one.
+gpu = [
+    "dep:wgpu",
+    "dep:pollster",
+    "dep:raw-window-handle",
+]
+# Config server. Its own binary target (`defconmon-config`) and its own build:
+# the display binary stays lean and can be built without it (std-only HTTP, no
+# extra dependencies beyond the shared config schema).
+web = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "unwind"   # so a GPU panic can fall back instead of killing the display
+strip = true
+
+# Two binaries sharing one library so their artifacts never overwrite each other:
+#   defconmon        -- the live display
+#   defconmon-config -- the web config server (needs the `web` feature)
+[[bin]]
+name = "defconmon"
+path = "src/bin/defconmon.rs"
+required-features = []   # the display builds from pure preview to full GPU
+
+[[bin]]
+name = "defconmon-config"
+path = "src/bin/defconmon-config.rs"
+# Only ever built for the server; distinct name so a `--features web` build
+# cannot clobber the display artifact (which is how the outage happened).
+required-features = ["web"]

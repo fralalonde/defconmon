@@ -257,7 +257,7 @@ fn row(cfg: &Cfg, p: &Param) -> String {
         }
         Kind::Text => format!(
             "<input type=\"text\" name=\"{name}\" value=\"{}\">",
-            esc(&cur.as_str().unwrap_or("").to_string())
+            esc(cur.as_str().unwrap_or(""))
         ),
         Kind::Choice => {
             let sel = cur.as_str().unwrap_or("");

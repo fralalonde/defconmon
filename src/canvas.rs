@@ -23,10 +23,11 @@ pub fn rgba(rgb: u32, a: u8) -> tiny_skia::Color {
 }
 
 fn paint(rgb: u32, a: u8) -> Paint<'static> {
-    let mut p = Paint::default();
-    p.shader = Shader::SolidColor(rgba(rgb, a));
-    p.anti_alias = true;
-    p
+    Paint {
+        shader: Shader::SolidColor(rgba(rgb, a)),
+        anti_alias: true,
+        ..Default::default()
+    }
 }
 
 // The CRT finish, in one place: these four numbers are the whole look.
@@ -55,6 +56,9 @@ pub struct Canvas {
     mul: Vec<u8>,
 }
 
+// The drawing API is deliberately positional (x, y, size, colour, alpha) to
+// match tiny-skia's style; bundling them into a struct would churn every screen.
+#[allow(clippy::too_many_arguments)]
 impl Canvas {
     pub fn new(w: u32, h: u32) -> Self {
         Self::with_scale(w, h, 1.0)
@@ -79,11 +83,6 @@ impl Canvas {
     /// Reset to black between frames (used by the live loop).
     pub fn clear(&mut self) {
         self.pm.fill(rgba(0x000000, 255));
-    }
-
-    #[inline]
-    fn s(&self, v: f32) -> f32 {
-        v * self.scale
     }
 
     fn rnd(&mut self) -> f32 {
@@ -377,7 +376,7 @@ impl Canvas {
                     continue;
                 }
                 let i = ((yy * dw + xx) as usize) * 4;
-                let kk = ((255 - a as usize) << 8) as usize;
+                let kk = (255 - a as usize) << 8;
                 let put = (a as usize) << 8;
                 data[i] = mul[kk | data[i] as usize].saturating_add(mul[put | cr as usize]);
                 data[i + 1] = mul[kk | data[i + 1] as usize].saturating_add(mul[put | cg as usize]);

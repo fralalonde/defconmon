@@ -18,12 +18,16 @@ use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_ba
 
 use crate::canvas::Canvas;
 use crate::config::Cfg;
+#[cfg(feature = "gpu")]
 use crate::gpu;
-use wayland_client::Proxy;
 use crate::data::Snap;
 use crate::fonts::Fonts;
 use crate::screens;
 use crate::screens::Env;
+// `id()` on a WlSurface is provided by this trait; only the gpu present path
+// needs the raw wl_surface pointer, so the import is gated with it.
+#[cfg(feature = "gpu")]
+use wayland_client::Proxy;
 
 struct Buf {
     buffer: wl_buffer::WlBuffer,
@@ -230,13 +234,10 @@ fn blit(src: &[u8], sw: u32, dw: u32, dh: u32, dst: &mut [u8], swizzle: bool, _r
             let o2 = o1 + inner;
             for x in 0..inner {
                 let sp = srow + (x >> 1) * 4;
-                match src[sp..sp + 4].try_into() {
-                    Ok(b) => {
-                        let px = u32::from_ne_bytes(b);
-                        dst32[o1 + x] = px;
-                        dst32[o2 + x] = px;
-                    }
-                    Err(_) => {}
+                if let Ok(b) = src[sp..sp + 4].try_into() {
+                    let px = u32::from_ne_bytes(b);
+                    dst32[o1 + x] = px;
+                    dst32[o2 + x] = px;
                 }
             }
         }
@@ -316,7 +317,10 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
     // Half-resolution rasterisation on a big screen, upscaled on present: 4x less
     // rasteriser work, and the chunkier pixels suit a CRT anyway.
     let scale = if w >= 1600 { 0.5 } else { 1.0 };
+    // raster-space dims reach the GPU path only; the CPU path upscales in blit()
+    #[cfg(feature = "gpu")]
     let rsw = ((w as f32 * scale).round() as u32).max(1);
+    #[cfg(feature = "gpu")]
     let rsh = ((h as f32 * scale).round() as u32).max(1);
 
     // ---- present path ------------------------------------------------------
@@ -324,8 +328,11 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
     // takes the upscale and the whole CRT finish and presents straight to the
     // Wayland surface; otherwise we keep the CPU pass and blit into shared
     // memory. Decided once: both paths own the surface and cannot interleave.
+    #[cfg(feature = "gpu")]
     let mut gpu: Option<gpu::Gpu> = None;
+    #[cfg(feature = "gpu")]
     let gpu_mode = cfg.s("gpu.mode", "auto");
+    #[cfg(feature = "gpu")]
     if std::env::var_os("DEFCONMON_NO_GPU").is_some() || gpu_mode == "off" {
         eprintln!("defconmon: GPU path off ({gpu_mode}); using the CPU/shm path");
     } else {
@@ -354,13 +361,18 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
             ),
         }
     }
+    #[cfg(feature = "gpu")]
+    let gpu_active = gpu.is_some();
+    // without the `gpu` feature the CPU/shm path is the only present path
+    #[cfg(not(feature = "gpu"))]
+    let gpu_active = false;
     let format = if state.has_xbgr {
         wl_shm::Format::Xbgr8888
     } else {
         wl_shm::Format::Xrgb8888
     };
     let swizzle = format == wl_shm::Format::Xrgb8888;
-    if gpu.is_none() {
+    if !gpu_active {
         eprintln!(
             "defconmon: surface {}x{}, shm format {:?}{}",
             w,
@@ -427,7 +439,7 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
 
         // pick a free buffer (the GPU path owns the surface, no shm buffers)
         let mut idx = 0usize;
-        if gpu.is_none() {
+        if !gpu_active {
             match state.buffers.iter().position(|b| !b.busy) {
                 Some(i) => idx = i,
                 None => {
@@ -443,16 +455,22 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
         let pick = names[((t / dwell.max(0.1)) as usize) % names.len()].as_str();
         let t_render = Instant::now();
         canvas.clear();
-        let env = Env { cfg: &cfg, snap: &feed, f: &fonts, gpu_crt: gpu.is_some() };
+        let env = Env { cfg: &cfg, snap: &feed, f: &fonts, gpu_crt: gpu_active };
         screens::render(pick, &mut canvas, &env, t);
         let render_ms = t_render.elapsed().as_secs_f64() * 1000.0;
 
         let t_blit = Instant::now();
-        if let Some(g) = gpu.as_mut() {
+        if gpu_active {
             // upload the scene; the shader does the upscale and the CRT finish
-            if let Err(e) = g.present(canvas.pm.data()) {
-                eprintln!("defconmon: present failed: {e}");
+            #[cfg(feature = "gpu")]
+            if let Some(g) = gpu.as_mut() {
+                if let Err(e) = g.present(canvas.pm.data()) {
+                    eprintln!("defconmon: present failed: {e}");
+                }
             }
+            #[cfg(not(feature = "gpu"))]
+            // gpu_active is statically false here, so this is never reached
+            unreachable!("GPU present path requires the `gpu` feature");
         } else {
             // blit into the shared buffer (upscaling if we rendered small; the
             // swizzle only happens when the compositor lacks XBGR8888)
@@ -487,7 +505,7 @@ pub fn run(conn: &Connection, mut cfg: Cfg) -> ! {
             }
         }
 
-        if gpu.is_none() {
+        if !gpu_active {
             let buf = &mut state.buffers[idx];
             buf.busy = true;
             surface.attach(Some(&buf.buffer), 0, 0);

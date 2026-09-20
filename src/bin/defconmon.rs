@@ -1,55 +1,77 @@
-mod canvas;
-mod clock;
-mod config;
-mod data;
-mod fonts;
-#[cfg(feature = "live")]
-mod gpu;
-#[cfg(feature = "live")]
-mod live;
-mod screens;
-#[cfg(feature = "web")]
-mod web;
+//! The live display binary (`defconmon`).
+//!
+//! Every mode except the configured server run from here: headless preview
+//! (`--out PNG`), benchmarking (`--bench`), and the live full-screen loop. The
+//! config server lives in its own binary (`defconmon-config`) so this artifact
+//! is never clobbered by a `--features web` build - the exact collision that
+//! took the family's screen down once.
+use defconmon::config::Cfg;
+use defconmon::data::Snap;
+use defconmon::fonts::Fonts;
+use defconmon::screens::Env;
+use defconmon::{arg, handle_introspect};
 
-use canvas::Canvas;
-use config::Cfg;
-use data::Snap;
-use fonts::Fonts;
-use screens::Env;
+const USAGE: &str = "\
+defconmon - retro-styled HDMI dashboard for a Proxmox homelab.
 
-fn arg(args: &[String], k: &str) -> Option<String> {
-    args.iter().position(|a| a == k).and_then(|i| args.get(i + 1)).cloned()
-}
+USAGE:
+  defconmon [--config PATH] --list | --params | --help | --version
+  defconmon [--config PATH] [--w W --h H --t T] --screen NAME --out PNG
+  defconmon [--config PATH] [--w W --h H] --bench N [--scale S]
+  defconmon [--config PATH]                      # live display (needs `live`)
+
+OPTIONS:
+  --list       print every registered screen (index, name, title)
+  --params     print every setting (key, kind, default) to stdout
+  --config P   config file (default /etc/defconmon/config.json)
+  --w W --h H  preview/bench resolution (default 1920x1080)
+  --t T        preview time offset in seconds
+  --screen N   preview screen name (default wopr)
+  --out PNG    headless preview: render one frame and write it
+  --bench N    render N frames and report ms/frame against the CPU budget
+  --scale S    bench scale factor (default 0.5)
+  --serve PORT (web build only) run the config server - see defconmon-config";
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
+    if handle_introspect(&args, USAGE) {
+        return;
+    }
+
     // ---- introspection: the registry is the single source of truth --------
     if args.iter().any(|a| a == "--list") {
-        for (i, s) in screens::SCREENS.iter().enumerate() {
+        for (i, s) in defconmon::screens::SCREENS.iter().enumerate() {
             println!("{i}\t{}\t{}", s.name, s.title);
         }
         return;
     }
     if args.iter().any(|a| a == "--params") {
-        for p in config::global_params().into_iter().chain(screens::all_params()) {
+        for p in defconmon::config::global_params()
+            .into_iter()
+            .chain(defconmon::screens::all_params())
+        {
             println!("{}\t{:?}\t{}", p.key, p.kind, p.default);
         }
         return;
     }
 
-    let path = arg(&args, "--config").unwrap_or_else(|| config::DEFAULT_PATH.to_string());
+    let path = arg(&args, "--config")
+        .unwrap_or_else(|| defconmon::config::DEFAULT_PATH.to_string());
     let cfg = Cfg::load(path);
 
     // ---- config server: a separate process, so it cannot disturb the display
     #[cfg(feature = "web")]
     if let Some(port) = arg(&args, "--serve").and_then(|s| s.parse::<u16>().ok()) {
-        web::serve(cfg, port);
-        return;
+        // serve() is `-> !`; the display loop below never runs on this path
+        defconmon::web::serve(cfg, port);
     }
     #[cfg(not(feature = "web"))]
     if args.iter().any(|a| a == "--serve") {
-        eprintln!("defconmon: built without the `web` feature - rebuild with --features web");
+        eprintln!(
+            "defconmon: built without the `web` feature - use defconmon-config \
+             (built with --features web)"
+        );
         std::process::exit(2);
     }
 
@@ -68,9 +90,9 @@ fn main() {
             // no live trend off-box: seed a preview history so FIG2 has data
             snap.seed_history();
         }
-        let mut cv = Canvas::new(w, h);
+        let mut cv = defconmon::canvas::Canvas::new(w, h);
         let env = Env { cfg: &cfg, snap: &snap, f: &fonts, gpu_crt: false };
-        screens::render(&screen, &mut cv, &env, t);
+        defconmon::screens::render(&screen, &mut cv, &env, t);
         std::fs::write(&out, cv.png()).expect("write png");
         println!(
             "wrote {out}  {w}x{h}  screen={screen}  t={t:.1}s  feed_live={}",
@@ -85,17 +107,18 @@ fn main() {
             snap.seed_history();
         }
         // 0.5 matches the live path; vary it to see how cost scales with pixels
-        let scale: f32 = arg(&args, "--scale").and_then(|s| s.parse().ok()).unwrap_or(0.5);
-        let mut cv = Canvas::with_scale(w, h, scale);
+        let scale: f32 =
+            arg(&args, "--scale").and_then(|s| s.parse().ok()).unwrap_or(0.5);
+        let mut cv = defconmon::canvas::Canvas::with_scale(w, h, scale);
         let env = Env { cfg: &cfg, snap: &snap, f: &fonts, gpu_crt: false };
         for i in 0..3 {
             cv.clear();
-            screens::render(&screen, &mut cv, &env, i as f32 * 0.1);
+            defconmon::screens::render(&screen, &mut cv, &env, i as f32 * 0.1);
         }
         let t0 = std::time::Instant::now();
         for i in 0..n {
             cv.clear();
-            screens::render(&screen, &mut cv, &env, i as f32 / 12.0);
+            defconmon::screens::render(&screen, &mut cv, &env, i as f32 / 12.0);
         }
         let ms = t0.elapsed().as_secs_f64() * 1000.0 / n as f64;
         println!(
@@ -116,13 +139,15 @@ fn main() {
                 std::process::exit(1);
             }
         };
-        live::run(&conn, cfg);
+        defconmon::live::run(&conn, cfg);
     }
 
     #[cfg(not(feature = "live"))]
     {
         let _ = (w, h, screen, cfg);
-        eprintln!("defconmon: built without the `live` feature; use --out FILE to render a PNG");
+        eprintln!(
+            "defconmon: built without the `live` feature; use --out FILE to render a PNG"
+        );
         std::process::exit(2);
     }
 }

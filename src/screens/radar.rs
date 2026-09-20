@@ -11,7 +11,6 @@ const GD: u32 = 0x186b32;
 const DIM: u32 = 0x0e4a22;
 const AMBER: u32 = 0xffb000;
 const RED: u32 = 0xff3030;
-const CYAN: u32 = 0x38e8ff;
 
 pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     let f = env.f;
@@ -77,7 +76,7 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     for (i, g) in feed.guests.iter().enumerate() {
         let b = hashf(i as u32 * 17 + 5) * std::f32::consts::TAU;
         let rr = 0.22 + hashf(i as u32 * 29 + 11) * 0.72;
-        let drift = (t * 0.02 * (1.0 + hashf(i as u32) as f32)).sin() * 0.06;
+        let drift = (t * 0.02 * (1.0 + hashf(i as u32))).sin() * 0.06;
         let bz = b + drift;
         let px = cx + r * rr * bz.sin();
         let py = cy - r * rr * bz.cos();

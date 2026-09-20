@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cpu
+            bin: defconmon
+            features: live
+          - name: gpu
+            bin: defconmon
+            features: live,gpu
+          - name: config
+            bin: defconmon-config
+            features: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: defconmon
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config libwayland-dev libegl-dev
+      - name: cargo check (${{ matrix.name }})
+        working-directory: .
+        run: cargo check --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+      - name: cargo test (${{ matrix.name }})
+        working-directory: .
+        run: cargo test --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+
+  scripts:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax checks
+        run: |
+          bash -n release.sh
+          sh -n scripts/install.sh

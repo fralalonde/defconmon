@@ -22,7 +22,6 @@ const G: u32 = 0x33ff66;
 const GD: u32 = 0x2f7a45;
 const DIM: u32 = 0x1d4a2c;
 const AMBER: u32 = 0xffb000;
-const RED: u32 = 0xff3030;
 
 /// Icosahedron: 12 vertices = 12 channels, one each.
 const PHI: f32 = 1.618_034;
@@ -48,9 +47,8 @@ const ICO_R: f32 = 1.902_113_5;
 /// construction (an icosahedron's 30 edges) rather than a hand-typed list.
 fn ico_edges() -> Vec<(usize, usize)> {
     let mut e = Vec::new();
-    for i in 0..ICO_V.len() {
-        for j in (i + 1)..ICO_V.len() {
-            let (a, b) = (ICO_V[i], ICO_V[j]);
+    for (i, a) in ICO_V.iter().enumerate() {
+        for (j, b) in ICO_V.iter().enumerate().skip(i + 1) {
             let d = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2) + (a.2 - b.2).powi(2)).sqrt();
             if d < 2.5 {
                 e.push((i, j));

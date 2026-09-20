@@ -1,0 +1,92 @@
+name: Build and release defconmon
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cpu
+            bin: defconmon
+            features: live
+          - name: gpu
+            bin: defconmon
+            features: live,gpu
+          - name: config
+            bin: defconmon-config
+            features: web
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: defconmon
+      # The live display builds link against the system C Wayland; the GPU
+      # build additionally needs the EGL headers. wgpu pulls EGL via dlopen at
+      # runtime, so only build-time dev headers are required here.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config libwayland-dev libegl-dev
+      - name: Build
+        working-directory: .
+        run: cargo build --release --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+      - name: Sanity check
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="target/release/${{ matrix.bin }}"
+          test -x "$bin"
+          # Must print a version derived from the git tag. What the string looks
+          # like depends on the build server's git state; just require output.
+          "$bin" --version >/dev/null || { echo "expected --version support" >&2; exit 1; }
+      - name: Assemble archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          bin="target/release/${{ matrix.bin }}"
+          case "${{ matrix.name }}" in
+            config) asset="defconmon-config-${ver}-x86_64-linux" ;;
+            *) asset="defconmon-${ver}-x86_64-linux-${{ matrix.name }}" ;;
+          esac
+          root="stage/${{ matrix.name }}"
+          mkdir -p "$root"
+          cp "$bin" "$root/${{ matrix.bin }}"
+          printf '%s\n' "$ver" > "$root/VERSION"
+          printf 'defconmon %s (%s build)\n' "$ver" "${{ matrix.name }}" > "$root/README"
+          (cd "$root" && sha256sum "${{ matrix.bin }}" VERSION README > checksums.txt)
+          tar -C stage -czf "$asset.tar.gz" "${{ matrix.name }}"
+          echo "ASSET=$asset.tar.gz" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: defconmon-${{ matrix.name }}
+          path: ${{ env.ASSET }}
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Add installer and aggregate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/install.sh release-assets/install.sh
+          (cd release-assets && sha256sum defconmon-*.tar.gz > checksums.txt)
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/*

@@ -1,4 +1,4 @@
-//! GPU present path, behind the `gles` feature.
+//! GPU present path, behind the `gpu` feature.
 //!
 //! The scene is still rasterised on the CPU by tiny-skia (that is the portable,
 //! dependency-free part, and thin antialiased strokes are what a CPU rasteriser
@@ -117,36 +117,6 @@ fn likely_worth_it(backend: wgpu::Backend, device_type: wgpu::DeviceType) -> boo
         wgpu::Backend::Gl => device_type == wgpu::DeviceType::DiscreteGpu,
         wgpu::Backend::BrowserWebGpu => false,
         _ => true,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::likely_worth_it as worth;
-    use wgpu::{Backend, DeviceType};
-
-    #[test]
-    fn the_box_we_measured_is_not_worth_it() {
-        // Caicos / Radeon HD 7450: GL backend, device class "other" (2011 iGPU).
-        // Measured 14.5% of a core against ~10% for the CPU pass.
-        assert!(!worth(Backend::Gl, DeviceType::Other));
-        assert!(!worth(Backend::Gl, DeviceType::IntegratedGpu));
-    }
-
-    #[test]
-    fn modern_and_discrete_stacks_are_worth_it() {
-        assert!(worth(Backend::Vulkan, DeviceType::IntegratedGpu));
-        assert!(worth(Backend::Vulkan, DeviceType::DiscreteGpu));
-        assert!(worth(Backend::Metal, DeviceType::IntegratedGpu));
-        // a discrete GL card has the headroom to absorb the submission cost
-        assert!(worth(Backend::Gl, DeviceType::DiscreteGpu));
-    }
-
-    #[test]
-    fn software_adapters_are_never_the_point() {
-        // (Cpu adapters are already rejected before this check, but the policy
-        // should not silently say yes to one.)
-        assert!(!worth(Backend::BrowserWebGpu, DeviceType::Other));
     }
 }
 
@@ -419,5 +389,35 @@ impl Gpu {
         self.queue.submit(Some(enc.finish()));
         self.queue.present(frame);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::likely_worth_it as worth;
+    use wgpu::{Backend, DeviceType};
+
+    #[test]
+    fn the_box_we_measured_is_not_worth_it() {
+        // Caicos / Radeon HD 7450: GL backend, device class "other" (2011 iGPU).
+        // Measured 14.5% of a core against ~10% for the CPU pass.
+        assert!(!worth(Backend::Gl, DeviceType::Other));
+        assert!(!worth(Backend::Gl, DeviceType::IntegratedGpu));
+    }
+
+    #[test]
+    fn modern_and_discrete_stacks_are_worth_it() {
+        assert!(worth(Backend::Vulkan, DeviceType::IntegratedGpu));
+        assert!(worth(Backend::Vulkan, DeviceType::DiscreteGpu));
+        assert!(worth(Backend::Metal, DeviceType::IntegratedGpu));
+        // a discrete GL card has the headroom to absorb the submission cost
+        assert!(worth(Backend::Gl, DeviceType::DiscreteGpu));
+    }
+
+    #[test]
+    fn software_adapters_are_never_the_point() {
+        // (Cpu adapters are already rejected before this check, but the policy
+        // should not silently say yes to one.)
+        assert!(!worth(Backend::BrowserWebGpu, DeviceType::Other));
     }
 }

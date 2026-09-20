@@ -299,7 +299,7 @@ pub fn coerce(p: &Param, raw: &str) -> Result<Value, String> {
         Kind::Bool => Ok(Value::Bool(raw == "on" || raw == "1" || raw == "true")),
         Kind::Text => Ok(Value::from(raw)),
         Kind::Choice => {
-            if p.choices.iter().any(|c| *c == raw) {
+            if p.choices.contains(&raw) {
                 Ok(Value::from(raw))
             } else {
                 Err(format!("'{}' is not one of the allowed values", raw))

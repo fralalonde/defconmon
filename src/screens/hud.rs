@@ -64,6 +64,8 @@ pub fn draw(cv: &mut Canvas, f: &Fonts, screen: &str, snap: &Snap) {
     cell(cv, f, c3, y, "DNS", &format!("{:.0}", snap.dns_ms), "ms", dcol);
 }
 
+// positional on purpose, like the Canvas primitives it calls
+#[allow(clippy::too_many_arguments)]
 fn cell(cv: &mut Canvas, f: &Fonts, cx: f32, y: f32, label: &str, value: &str, unit: &str, col: u32) {
     cv.text(&f.a3270, 20.0, cx + 4.0, y + 44.0, LABEL, 235, label);
     let vw = cv.text(&f.dseg7, 34.0, cx + 4.0, y + 76.0, col, 245, value);
