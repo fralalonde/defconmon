@@ -6,7 +6,8 @@
 //!
 //! The display is CPU-only unless the `gpu` feature is added: tiny-skia + real
 //! glyph outlines rasterise full-screen, and an optional wgpu/EGL path takes the
-//! upscale and CRT finish. `live` supplies the pure-Rust Wayland present path.
+//! upscale and CRT finish. The present path itself (pure-Rust Wayland) is the
+//! core of the display and is always compiled.
 pub mod canvas;
 pub mod clock;
 pub mod config;
@@ -14,7 +15,6 @@ pub mod data;
 pub mod fonts;
 #[cfg(feature = "gpu")]
 pub mod gpu;
-#[cfg(feature = "live")]
 pub mod live;
 pub mod screens;
 #[cfg(feature = "web")]

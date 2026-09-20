@@ -5,3 +5,5 @@ target-*/
 .defconmon-gif/
 previews/
 gpu-spike/
+docs/RELEASING.md
+reference/

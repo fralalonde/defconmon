@@ -82,7 +82,12 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     cv.line(pad, hy + 24.0, w - pad, hy + 24.0, 2.0, GD, 210);
 
     // ---------------- centre typewriter ----------------
-    let m1 = "GREETINGS PROFESSOR FALKEN.";
+    // The greeting addresses a configurable user (default: the WarGames hero).
+    // `wopr.user` is the whole name; the footer derives a short form from its
+    // last word.
+    let user = env.cfg.s("wopr.user", "PROFESSOR FALKEN");
+    let user_up = user.to_uppercase();
+    let m1 = format!("GREETINGS {user_up}.");
     let m2 = "SHALL WE PLAY A GAME?";
     let cps = 15.0f32;
     let n1 = ((t * cps) as usize).min(m1.len());
@@ -141,7 +146,16 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     // ---------------- footer ----------------
     let fy = h - pad - 18.0;
     cv.line(pad, fy - 34.0, w - pad, fy - 34.0, 2.0, GD, 200);
-    cv.text(&f.a3270, 26.0, pad, fy, GD, 220, "CHEYENNE MOUNTAIN COMPLEX  //  USER: FALKEN  //  TTY-33");
+    let short = user.split_whitespace().last().unwrap_or("").to_uppercase();
+    cv.text(
+        &f.a3270,
+        26.0,
+        pad,
+        fy,
+        GD,
+        220,
+        &format!("CHEYENNE MOUNTAIN COMPLEX  //  USER: {short}  //  TTY-33"),
+    );
     let hint = "AWAITING INPUT_";
     let hw = cv.text_w(&f.a3270, 26.0, hint);
     cv.text(&f.a3270, 26.0, w - pad - hw, fy, if blink { G } else { GD }, 235, hint);
@@ -151,12 +165,23 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
 
 /// Knobs this screen owns, surfaced by the config server.
 pub fn params() -> Vec<Param> {
-    vec![Param::i(
-        "wopr.log_rows",
-        "System log rows",
-        14,
-        4.0,
-        16.0,
-        "Lines of NORAD chatter in the right-hand log. Longer logs scroll faster.",
-    )]
+    vec![
+        Param::i(
+            "wopr.log_rows",
+            "System log rows",
+            14,
+            4.0,
+            16.0,
+            "Lines of NORAD chatter in the right-hand log. Longer logs scroll faster.",
+        ),
+        // The addressee of the screen's greeting line and the name the console
+        // footer shows. A WarGames character by default; a homelab owner usually
+        // points it at themselves.
+        Param::t(
+            "wopr.user",
+            "Greeting addressee",
+            "PROFESSOR FALKEN",
+            "Who the WOPR console greets in the typewriter line and shows in the USER field of the footer.",
+        ),
+    ]
 }

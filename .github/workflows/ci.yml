@@ -14,13 +14,13 @@ jobs:
         include:
           - name: cpu
             bin: defconmon
-            features: live
+            flags: --no-default-features
           - name: gpu
             bin: defconmon
-            features: live,gpu
+            flags: ""
           - name: config
             bin: defconmon-config
-            features: web
+            flags: ""
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -33,10 +33,10 @@ jobs:
           sudo apt-get install -y -qq pkg-config libwayland-dev libegl-dev
       - name: cargo check (${{ matrix.name }})
         working-directory: .
-        run: cargo check --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+        run: cargo check --bin ${{ matrix.bin }} ${{ matrix.flags }}
       - name: cargo test (${{ matrix.name }})
         working-directory: .
-        run: cargo test --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+        run: cargo test --bin ${{ matrix.bin }} ${{ matrix.flags }}
 
   scripts:
     runs-on: ubuntu-22.04

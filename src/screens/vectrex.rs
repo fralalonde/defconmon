@@ -162,7 +162,7 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
     }
 
     // ---------------- HUD ----------------
-    cv.glow_text(&f.vga, 30.0, pad, pad + 20.0, G, "VECTREX  //  METRIC SOLIDS");
+    cv.glow_text(&f.a3270, 30.0, pad, pad + 20.0, G, "VECTREX  //  METRIC SOLIDS");
     let (hh, mm, ss) = clock::now_hms();
     let clock = format!("{hh:02}:{mm:02}:{ss:02}");
     let cw = cv.text_w(&f.dseg7, 34.0, &clock);

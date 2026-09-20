@@ -10,39 +10,30 @@ serde_json = "1"
 # for localtime_r: the dashboard shows a wall clock, so it must respect TZ/DST
 libc = "0.2"
 
-# Live path: pure-Rust Wayland backend (no libwayland, no xkbcommon) so the
-# binary stays static-musl and dependency-free on the container.
-wayland-client = { version = "0.31", default-features = false, optional = true }
-wayland-protocols = { version = "0.32", default-features = false, features = ["client"], optional = true }
-memmap2 = { version = "0.9", optional = true }
+# Live display core: pure-Rust Wayland present path, always built. `system`
+# gives the C libwayland backend, which is what exposes the raw wl_display
+# pointer the GPU path (EGL) needs.
+wayland-client = { version = "0.31", default-features = false, features = ["system"] }
+wayland-protocols = { version = "0.32", default-features = false, features = ["client"] }
+memmap2 = "0.9"
 
 # GPU present path. wgpu loads EGL via dlopen at runtime, so it is a *runtime*
-# dependency that may be absent - the CPU path is the fallback. Kept behind its
-# own `gpu` feature so the plain `live` build never links wgpu: the CPU-only
-# display stays a small, dependency-free binary (~2 MB) and the GPU one is only
-# built when explicitly asked. The GPU display binary is a dynamic glibc build
-# (built in a Debian-12 container, not the static-musl form): EGL needs a real
-# wl_display/wl_surface, which the pure-Rust Wayland backend does not have.
+# dependency that may be absent - the CPU path is the fallback. It is behind the
+# `gpu` feature so a `--no-default-features` build stays a small, dependency-free
+# CPU-only display (~2 MB); the GPU binary is a dynamic glibc build (built in a
+# Debian-12 container, not the static-musl form): EGL needs a real wl_display/
+# wl_surface, which the pure-Rust Wayland backend does not have.
 wgpu = { version = "30", default-features = false, features = ["gles", "wgsl"], optional = true }
 pollster = { version = "0.4", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
 
 [features]
-default = []
-# `system` gives the C libwayland backend, which is what exposes the raw
-# wl_display pointer EGL needs. Preview/bench builds don't enable it.
-#
-# Deliberately does NOT pull wgpu: `gpu` is a separate feature so the two build
-# flavours are real (CPU-only vs GPU present). Combine `live,gpu` for the full
-# display.
-live = [
-    "dep:wayland-client",
-    "dep:wayland-protocols",
-    "dep:memmap2",
-    "wayland-client/system",
-]
-# GPU present path: wgpu/EGL does the upscale and the whole CRT finish. Orthogonal
-# to `live` - add it on top for a display build, or drop it for the lean CPU one.
+# Both optional profiles are on by default, so a plain `cargo build` is the full
+# display + config server. Drop them with `--no-default-features` for the lean
+# CPU-only display.
+default = ["gpu", "web"]
+# GPU present path: wgpu/EGL does the upscale and the whole CRT finish. Optional:
+# disable it for the lean CPU-only present path.
 gpu = [
     "dep:wgpu",
     "dep:pollster",

@@ -28,7 +28,7 @@
 #     debian:12 bash -c 'export PATH=/cargo/bin:$PATH; \
 #       apt-get update -qq && apt-get install -y -qq gcc libc6-dev pkg-config \
 #         libwayland-dev libegl-dev; \
-#       cargo build --release --bin defconmon --features live'
+#       cargo build --release --bin defconmon'
 # (CARGO_TARGET_DIR=/src/target-gif keeps it out of the concurrent agents'
 # target dirs; bare `cargo` is NOT on the container PATH, export it first.)
 

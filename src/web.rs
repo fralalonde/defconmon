@@ -121,8 +121,6 @@ fn route(method: &str, path: &str, body: &str, cfg: &Mutex<Cfg>, is_hx: bool) ->
         ),
         (_, "/fonts/3270.ttf") => font(crate::fonts::F_3270),
         (_, "/fonts/dseg7.ttf") => font(crate::fonts::F_DSEG7),
-        (_, "/fonts/vga.ttf") => font(crate::fonts::F_VGA),
-        (_, "/fonts/terminus.ttf") => font(crate::fonts::F_TERM),
         (_, "/") => {
             let c = cfg.lock().unwrap();
             let html = page(&c, "");

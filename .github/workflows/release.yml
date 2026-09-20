@@ -15,13 +15,13 @@ jobs:
         include:
           - name: cpu
             bin: defconmon
-            features: live
+            flags: --no-default-features
           - name: gpu
             bin: defconmon
-            features: live,gpu
+            flags: ""
           - name: config
             bin: defconmon-config
-            features: web
+            flags: ""
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +29,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: defconmon
-      # The live display builds link against the system C Wayland; the GPU
-      # build additionally needs the EGL headers. wgpu pulls EGL via dlopen at
+      # The display links against the system C Wayland; the GPU build
+      # additionally needs the EGL headers. wgpu pulls EGL via dlopen at
       # runtime, so only build-time dev headers are required here.
       - name: Install build dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
           sudo apt-get install -y -qq pkg-config libwayland-dev libegl-dev
       - name: Build
         working-directory: .
-        run: cargo build --release --bin ${{ matrix.bin }} --features ${{ matrix.features }}
+        run: cargo build --release --bin ${{ matrix.bin }} ${{ matrix.flags }}
       - name: Sanity check
         shell: bash
         run: |

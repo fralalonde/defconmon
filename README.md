@@ -3,7 +3,8 @@
 Retro-styled, full-screen local dashboard for a Proxmox homelab.
 Renders a "home sector defence" wall display, cycling five full-screen scenes
 with a persistent status plate (DEFCON / WAN throughput / PING / DNS) on every
-screen. Replaces a conky setup; conky stays one command away as a revert.
+screen. A standalone dashboard — its own thing, not a wrapper over another
+monitor.
 
 ![defconmon screens](docs/defconmon.gif)
 
@@ -26,28 +27,25 @@ whichever position.
 
 ## Build
 
-x86_64 Linux only. Three configurations:
+x86_64 Linux only. Two features, both **on by default**:
+
+- `gpu` — wgpu present path (EGL/Wayland via dlopen; see DEV.md)
+- `web` — the config server binary `defconmon-config`
 
 ```sh
-# CPU display — ships to this box
-cargo build --release --bin defconmon --features live          # ~2 MB bin, ~12 MB RSS
-
-# GPU display — for boxes where the GPU wins (see Hardware)
-cargo build --release --bin defconmon --features live,gpu      # ~5.6 MB bin, ~53 MB RSS
-
-# config server (separate process, LAN only)
-cargo build --release --bin defconmon-config --features web
+cargo build --release                                        # default: GPU present path + config server
+cargo build --release --no-default-features                   # CPU-only display, no wgpu (~2 MB vs ~5.4 MB)
+cargo build --release --no-default-features --features web    # CPU-only display + config server
+cargo build --release --bin defconmon-config                  # the config server binary
 ```
-
-Both feature sets share one output path — build, copy, then rebuild the other.
 
 Rendering pipeline:
 
 - **tiny-skia** — pure-CPU vector rasteriser; **ab_glyph** — real glyph outlines
   for text. Fonts (IBM 3270, DSEG7, Px VGA, Terminus) are embedded in the binary.
-- The optional GPU path (wgpu 30, GL/EGL backend) only does the nearest-neighbour
-  upscale and the CRT finish; the fonts and vector art **always** rasterise on the
-  CPU. The look survives with the GPU off.
+- The GPU path (wgpu 30, GL/EGL backend) only does the nearest-neighbour upscale
+  and the CRT finish; the fonts and vector art **always** rasterise on the CPU.
+  The look survives with the GPU off.
 
 ## Run / deploy
 
@@ -60,17 +58,6 @@ unit, so tuning needs no restart.
 |---|---|
 | `dashboard.service` + `dashboard.service.d/defconmon.conf` | `cage -- /usr/local/bin/defconmon --config /etc/defconmon/config.json` |
 | `defconmon-config.service` | `/usr/local/bin/defconmon-config --config /etc/defconmon/config.json --serve 8080` |
-
-### Revert to conky — one command
-
-```sh
-rm /etc/systemd/system/dashboard.service.d/defconmon.conf
-systemctl daemon-reload && systemctl restart dashboard.service
-```
-
-The preserved conky config stays at `/usr/local/etc/dashboard/conky.classic.conf`;
-copy it back over `~dashboard/.config/conky/conky.conf` if the stock unit reads
-one.
 
 ## Config
 
@@ -88,11 +75,13 @@ server and the display, so a crashed web server cannot take the display down.
   "radar.sweep_rpm": 8.6,
   "telemetry.full_scale": 100,
   "vectrex.spin": 100,
-  "wopr.log_rows": 14
+  "wopr.log_rows": 14,
+  "wopr.user": "PROFESSOR FALKEN"
 }
 ```
 
-Authoritative schema in `src/config.rs`. Sections:
+Authoritative schema in `src/config.rs`. Sections: `display`, `hud`, `wopr`,
+`defcon`, `radar`, `telemetry`, `vectrex`, `gpu`.
 
 | key | kind | default | note |
 |---|---|---|---|
@@ -100,65 +89,20 @@ Authoritative schema in `src/config.rs`. Sections:
 | `display.dwell` | int 5..300 | 20 | seconds per screen |
 | `display.screens` | text | `wopr,defcon,radar,telemetry,vectrex` | comma order; drop one to take it out |
 | `hud.visible` | bool | true | status plate on all screens |
-| `gpu.mode` | choice | `auto` | `auto` / `on` / `off` (see Hardware) |
+| `gpu.mode` | choice | `auto` | `auto` / `on` / `off` (see DEV.md) |
 | `wopr.log_rows` | int | 14 | |
+| `wopr.user` | text | `PROFESSOR FALKEN` | addressee shown on the WOPR screen |
 | `defcon.pulse_rate` | float | 0.9 | |
 | `radar.sweep_rpm` | float | 8.6 | |
 | `telemetry.full_scale` | float | 100 | |
 | `vectrex.spin` | int | 100 | |
 
-**Config web server** — separate process, `web` feature, std-only HTTP + htmx
-(no web framework, no dependencies). Plain HTTP on the LAN, no auth, by design.
-Edits `config.json`; validation is atomic (coercion and range checks before
-anything is written). The UI walks the schema and never names a screen or metric,
-so a new setting is one line in the screen that consumes it and a new screen
-needs no UI change.
-
-## Hardware / GPU
-
-Honest numbers, measured on this box (Radeon HD 7450 / Caicos, TeraScale 2, Mesa
-r600 GL backend):
-
-- **GPU path: 14.5% of one core** vs **~10% for the tuned CPU pass**. The
-  per-frame texture upload plus GL submission costs more than the CPU mask pass.
-- Hence `gpu.mode=auto`: the GPU is used only where it is likely to win — a
-  non-GL backend (Vulkan/Metal/DX12) or a discrete GL card. Integrated + GL falls
-  back to the CPU.
-- The **lean CPU build ships to this box**; the GPU binary stays in the tree
-  behind `live,gpu` for machines with real GPU headroom, where it wins.
-
-Two rules the dashboard is held to:
-
-- **Decorative is fine; contradictory is not.** A screen may be pure fiction (the
-  WOPR log is NORAD chatter), but no screen may display a value that contradicts
-  measurable state. Real signal loss came from violating this (`DEFCON 3`
-  hardcoded while the board computed the real level, two screens disagreeing on
-  the time).
-- **Portability.** The CPU path is pure Rust, no `cfg(target_arch)`, no SIMD
-  intrinsics — it runs anywhere. Nothing user-visible depends on the GPU.
-
-## Versioning
-
-The git tag is the source of truth and is injected at compile time by `build.rs`
-— never hardcoded. Releases are cut manually; see
-[docs/RELEASING.md](docs/RELEASING.md).
-
-## Measuring
-
-```sh
-./defconmon --bench 40 --screen radar --scale 0.5   # ms/frame for one screen
-./defconmon --list                                 # screen registry
-./defconmon --params                               # full schema
-./defconmon --screen wopr --t 7.3 --out wopr.png   # headless frame
-./defconmon --feed examples/sample-feed.json --screen defcon --out defcon.png
-```
-
-`--t SECONDS` is the scene clock, so any frame of the animation can be inspected.
-`--feed PATH` renders from a feed JSON instead of the live one; pass
-`--feed examples/sample-feed.json` to draw previews from the bundled sample
-data (works off-box, no live feed required). Without `--feed`, the live feed is
-read from `/run/dashboard/dashboard.json` (falling back to `./dashboard.json`).
-Stop the live service before benchmarking — single-core container.
+**Config web server** — separate process (the `defconmon-config` binary),
+std-only HTTP + htmx (no web framework, no dependencies). Plain HTTP on the LAN,
+no auth, by design. Edits `config.json`; validation is atomic (coercion and
+range checks before anything is written). The UI walks the schema and never
+names a screen or metric, so a new setting is one line in the screen that
+consumes it and a new screen needs no UI change.
 
 ## Inspiration
 

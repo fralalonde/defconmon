@@ -18,7 +18,7 @@ USAGE:
   defconmon [--config PATH] --list | --params | --help | --version
   defconmon [--config PATH] [--w W --h H --t T --feed PATH] --screen NAME --out PNG
   defconmon [--config PATH] [--w W --h H] --bench N [--scale S]
-  defconmon [--config PATH]                      # live display (needs `live`)
+  defconmon [--config PATH]                      # live display
 
 OPTIONS:
   --list       print every registered screen (index, name, title)
@@ -71,8 +71,8 @@ fn main() {
     #[cfg(not(feature = "web"))]
     if args.iter().any(|a| a == "--serve") {
         eprintln!(
-            "defconmon: built without the `web` feature - use defconmon-config \
-             (built with --features web)"
+            "defconmon: built without the `web` feature; run defconmon-config instead \
+             (or rebuild without --no-default-features)"
         );
         std::process::exit(2);
     }
@@ -131,25 +131,13 @@ fn main() {
     }
 
     // ---- live: put it on the compositor ----------------------------------
-    #[cfg(feature = "live")]
-    {
-        eprintln!("defconmon: live  config={}", cfg.path.display());
-        let conn = match wayland_client::Connection::connect_to_env() {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("defconmon: cannot connect to a Wayland display: {e}");
-                std::process::exit(1);
-            }
-        };
-        defconmon::live::run(&conn, cfg);
-    }
-
-    #[cfg(not(feature = "live"))]
-    {
-        let _ = (w, h, screen, cfg);
-        eprintln!(
-            "defconmon: built without the `live` feature; use --out FILE to render a PNG"
-        );
-        std::process::exit(2);
-    }
+    eprintln!("defconmon: live  config={}", cfg.path.display());
+    let conn = match wayland_client::Connection::connect_to_env() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("defconmon: cannot connect to a Wayland display: {e}");
+            std::process::exit(1);
+        }
+    };
+    defconmon::live::run(&conn, cfg);
 }
