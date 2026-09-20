@@ -17,7 +17,7 @@ mark() { # mark <base> <level>
 
 # ---- PING: 3 probes to a public anycast target ------------------------------
 gw=0; inet=0; dns=0; ms=0; prtt=0; ploss=100
-ping -c1 -W2 192.168.1.1 >/dev/null 2>&1 && gw=1
+ping -c1 -W2 192.0.2.1 >/dev/null 2>&1 && gw=1
 
 pout="$(ping -c3 -W2 1.1.1.1 2>/dev/null)" || true
 ploss="$(printf '%s\n' "$pout" | grep -o '[0-9]*% packet loss' | grep -o '^[0-9]*')"

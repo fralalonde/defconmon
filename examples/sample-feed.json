@@ -1,0 +1,33 @@
+{
+  "gateway": 1,
+  "internet": 1,
+  "dns": 1,
+  "ping_ms": 12.4,
+  "ping_loss": 0,
+  "dns_ms": 18,
+  "firewall_reachable": 1,
+  "wan": {
+    "online": 1,
+    "rx_mbps": 42.5,
+    "tx_mbps": 8.2,
+    "line_rate": 1000000000
+  },
+  "pve": {
+    "online": 1,
+    "node": "pve-node-01",
+    "cpu": 0.12,
+    "mempct": 47,
+    "guests_running": 6,
+    "guests_total": 8,
+    "guests": [
+      { "vmid": 100, "name": "firewall",   "status": "running", "cpu": 0.03 },
+      { "vmid": 101, "name": "dns-filter", "status": "running", "cpu": 0.01 },
+      { "vmid": 102, "name": "files",      "status": "running", "cpu": 0.18 },
+      { "vmid": 103, "name": "media",      "status": "running", "cpu": 0.22 },
+      { "vmid": 104, "name": "backup",     "status": "running", "cpu": 0.04 },
+      { "vmid": 105, "name": "monitoring", "status": "running", "cpu": 0.09 },
+      { "vmid": 106, "name": "notes",      "status": "stopped", "cpu": 0.0 },
+      { "vmid": 107, "name": "ci-runner",  "status": "stopped", "cpu": 0.0 }
+    ]
+  }
+}

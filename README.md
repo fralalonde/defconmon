@@ -1,10 +1,9 @@
 # defconmon
 
-Retro-styled, full-screen HDMI dashboard for a Proxmox homelab, written in Rust.
-Renders a "home sector defence" wall display on `CT 107` (`monitor`,
-192.168.1.4), cycling five full-screen scenes with a persistent status plate
-(DEFCON / WAN throughput / PING / DNS) on every screen. Replaces a conky setup;
-conky stays one command away as a revert.
+Retro-styled, full-screen local dashboard for a Proxmox homelab.
+Renders a "home sector defence" wall display, cycling five full-screen scenes
+with a persistent status plate (DEFCON / WAN throughput / PING / DNS) on every
+screen. Replaces a conky setup; conky stays one command away as a revert.
 
 ![defconmon screens](docs/defconmon.gif)
 
@@ -151,9 +150,14 @@ The git tag is the source of truth and is injected at compile time by `build.rs`
 ./defconmon --list                                 # screen registry
 ./defconmon --params                               # full schema
 ./defconmon --screen wopr --t 7.3 --out wopr.png   # headless frame
+./defconmon --feed examples/sample-feed.json --screen defcon --out defcon.png
 ```
 
 `--t SECONDS` is the scene clock, so any frame of the animation can be inspected.
+`--feed PATH` renders from a feed JSON instead of the live one; pass
+`--feed examples/sample-feed.json` to draw previews from the bundled sample
+data (works off-box, no live feed required). Without `--feed`, the live feed is
+read from `/run/dashboard/dashboard.json` (falling back to `./dashboard.json`).
 Stop the live service before benchmarking — single-core container.
 
 ## Inspiration

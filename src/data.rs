@@ -79,7 +79,7 @@ impl Feed {
             gateway: truthy(v, "gateway"),
             internet: truthy(v, "internet"),
             dns: truthy(v, "dns"),
-            opn_reach: truthy(v, "opnsense_reachable"),
+            opn_reach: truthy(v, "firewall_reachable"),
             wan_online: truthy(&wan, "online"),
             wan_rx: f(&wan, "rx_mbps"),
             wan_tx: f(&wan, "tx_mbps"),
@@ -98,18 +98,18 @@ impl Feed {
         }
     }
 
-    /// Mirror of the real homelab, for off-box previews.
+    /// Generic sample data, for off-box previews and documentation. Mirrors
+    /// `examples/sample-feed.json`; keep the two in step.
     pub fn synthetic() -> Feed {
         let names = [
-            ("opnsense", true, 4.0),
-            ("adguard", true, 0.1),
-            ("immich", true, 0.9),
-            ("torrent", true, 0.5),
-            ("music", true, 0.4),
-            ("monitor", true, 20.1),
-            ("debian-cloudinit", false, 0.0),
-            ("buro", false, 0.0),
-            ("agent", false, 0.0),
+            ("firewall", true, 4.0),
+            ("dns-filter", true, 0.1),
+            ("files", true, 0.9),
+            ("media", true, 0.5),
+            ("backup", true, 0.4),
+            ("monitoring", true, 20.1),
+            ("notes", false, 0.0),
+            ("ci-runner", false, 0.0),
         ];
         Feed {
             gateway: true,
@@ -124,11 +124,11 @@ impl Feed {
             ping_loss: 0.0,
             dns_ms: 15.0,
             pve_online: true,
-            pve_node: "streaker".into(),
+            pve_node: "pve-node-01".into(),
             pve_cpu: 11.0,
             pve_mem: 61.0,
             guests_running: 6,
-            guests_total: 9,
+            guests_total: 8,
             guests: names
                 .iter()
                 .map(|(n, u, c)| Guest { name: n.to_string(), up: *u, cpu: *c })
@@ -166,7 +166,7 @@ pub const MED_W: usize = 90;
 
 const NAMES: [&str; NCH] = [
     "WAN RX", "WAN TX", "PING", "DNS", "PVE CPU", "PVE MEM", "GUESTS", "WAN LINK", "GATEWAY",
-    "INTERNET", "PVE NODE", "OPNSENSE",
+    "INTERNET", "PVE NODE", "FIREWALL",
 ];
 const UNITS: [&str; NCH] = [
     "Mb/s", "Mb/s", "ms", "ms", "%", "%", "up", "", "", "", "", "",
@@ -214,7 +214,7 @@ pub struct Sample {
     pub gateway: f32,
     pub internet: f32,
     pub pve_node: f32,
-    pub opnsense: f32,
+    pub firewall: f32,
 }
 
 impl Sample {
@@ -231,7 +231,7 @@ impl Sample {
             8 => self.gateway,
             9 => self.internet,
             10 => self.pve_node,
-            11 => self.opnsense,
+            11 => self.firewall,
             _ => 0.0,
         }
     }
@@ -254,10 +254,23 @@ impl Deref for Snap {
 }
 
 impl Snap {
+    /// Load the live feed from the default locations. Default behaviour unless
+    /// `--feed` is given.
     pub fn load() -> Snap {
-        let txt = fs::read_to_string("/run/dashboard/dashboard.json")
-            .or_else(|_| fs::read_to_string("dashboard.json"))
-            .ok();
+        Snap::load_feed(None)
+    }
+
+    /// Load the feed, preferring an explicit `--feed PATH` when supplied and
+    /// otherwise falling back to the default live locations exactly as before.
+    /// A missing/unreadable feed falls back to synthetic sample data so
+    /// previews still render off-box.
+    pub fn load_feed(feed: Option<&str>) -> Snap {
+        let txt = match feed {
+            Some(p) => fs::read_to_string(p).ok(),
+            None => fs::read_to_string("/run/dashboard/dashboard.json")
+                .or_else(|_| fs::read_to_string("dashboard.json"))
+                .ok(),
+        };
         match txt.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) {
             Some(v) => Snap { feed: Feed::from_json(&v), hist: Vec::new() },
             None => Snap::synthetic(),
@@ -319,7 +332,7 @@ impl Snap {
             gateway: f.gateway as u8 as f32,
             internet: f.internet as u8 as f32,
             pve_node: f.pve_online as u8 as f32,
-            opnsense: f.opn_reach as u8 as f32,
+            firewall: f.opn_reach as u8 as f32,
         }
     }
 

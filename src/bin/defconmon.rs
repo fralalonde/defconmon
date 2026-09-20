@@ -16,7 +16,7 @@ defconmon - retro-styled HDMI dashboard for a Proxmox homelab.
 
 USAGE:
   defconmon [--config PATH] --list | --params | --help | --version
-  defconmon [--config PATH] [--w W --h H --t T] --screen NAME --out PNG
+  defconmon [--config PATH] [--w W --h H --t T --feed PATH] --screen NAME --out PNG
   defconmon [--config PATH] [--w W --h H] --bench N [--scale S]
   defconmon [--config PATH]                      # live display (needs `live`)
 
@@ -26,6 +26,8 @@ OPTIONS:
   --config P   config file (default /etc/defconmon/config.json)
   --w W --h H  preview/bench resolution (default 1920x1080)
   --t T        preview time offset in seconds
+  --feed PATH  feed JSON to render instead of the live one (e.g. a sample);
+               default reads /run/dashboard/dashboard.json then ./dashboard.json
   --screen N   preview screen name (default wopr)
   --out PNG    headless preview: render one frame and write it
   --bench N    render N frames and report ms/frame against the CPU budget
@@ -82,7 +84,7 @@ fn main() {
     let out = arg(&args, "--out");
 
     let fonts = Fonts::load();
-    let mut snap = Snap::load();
+    let mut snap = Snap::load_feed(arg(&args, "--feed").as_deref());
 
     // ---- headless preview: render one frame to a PNG ----------------------
     if let Some(out) = out {

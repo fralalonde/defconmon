@@ -100,7 +100,9 @@ pub fn render(cv: &mut Canvas, env: &Env, t: f32) {
         true,
     );
     cv.text_c(&f.a3270, 22.0, gx, gy + 8.0, gc, 255, "GATEWAY");
-    cv.text_c(&f.a3270, 18.0, gx, gy + 66.0, GD, 220, "192.168.1.1");
+    // RFC 5737 documentation range: the feed carries no address, and a real
+    // gateway IP has no business in a public repo.
+    cv.text_c(&f.a3270, 18.0, gx, gy + 66.0, GD, 220, "192.0.2.1");
 
     // bus + guest constellation
     cv.line(mx0 + 40.0, y_bus, mx1 - 40.0, y_bus, 1.6, DIM, 190);
