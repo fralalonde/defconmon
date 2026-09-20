@@ -1,0 +1,134 @@
+/* Theme for the defconmon config server.
+ *
+ * Deliberately the same machine as the display: identical phosphor palette, the
+ * same three typefaces (served straight out of the binary), uppercase plotter
+ * headings, hairline boxes, no rounded corners, no shadows. It is a control
+ * panel, not a poster - legible beats atmospheric - but it should read as part
+ * of the same equipment.
+ */
+@font-face { font-family: 'IBM3270'; src: url('/fonts/3270.ttf') format('truetype'); }
+@font-face { font-family: 'PxVGA';   src: url('/fonts/vga.ttf') format('truetype'); }
+/* DSEG7 stays out of the UI: the display uses it for big numerals, but a
+   form field is a control, so it gets the technical face instead. */
+
+:root {
+  --green: #33ff66;
+  --dim:   #2f7a45;
+  --faint: #1d4a2c;
+  --amber: #ffb000;
+  --red:   #ff3030;
+  --cyan:  #38e8ff;
+  --bg:    #000000;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--green); }
+body {
+  font-family: 'PxVGA', ui-monospace, monospace;
+  font-size: 15px;
+  line-height: 1.55;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+/* faint scanlines, same trick as the CRT finish on the display */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 9;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.28) 2px 4px);
+}
+
+h1, h2, h3, .bar, .btn, .lbl, .tab, .val { font-family: 'IBM3270', monospace; }
+
+/* ---- chrome ---- */
+.bar {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .7rem 1.3rem;
+  border-bottom: 1px solid var(--dim);
+  text-transform: uppercase; letter-spacing: .09em; font-size: 15px;
+}
+.bar.bottom { border-bottom: 0; border-top: 1px solid var(--dim); margin-top: auto; }
+.brand { color: var(--green); letter-spacing: .16em; }
+.sub, .sep { color: var(--dim); }
+.right { margin-left: auto; color: var(--dim); font-size: 13px; }
+.right a { color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--faint); }
+.right a:hover { color: var(--green); border-color: var(--dim); }
+
+main { padding: 1.3rem; max-width: 1180px; width: 100%; margin: 0 auto; }
+
+/* ---- sections: one per screen, straight from the registry ---- */
+section { border: 1px solid var(--faint); margin: 0 0 1.4rem; }
+section > header {
+  display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+  padding: .55rem .9rem;
+  border-bottom: 1px solid var(--faint);
+  background: rgba(51,255,102,.035);
+}
+section h2 {
+  margin: 0; font-size: 17px; font-weight: normal;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--green);
+}
+.blurb { color: var(--dim); font-size: 13px; }
+.body { padding: .5rem .9rem .9rem; }
+
+/* ---- a setting ---- */
+.row {
+  display: grid;
+  grid-template-columns: 230px 190px 1fr;
+  gap: .9rem;
+  align-items: baseline;
+  padding: .55rem 0;
+  border-bottom: 1px dashed var(--faint);
+}
+.row:last-child { border-bottom: 0; }
+.lbl { color: var(--green); letter-spacing: .07em; text-transform: uppercase; font-size: 14px; }
+.key { display: block; color: var(--faint); font-size: 12px; letter-spacing: .04em; }
+.help { color: var(--dim); font-size: 13px; }
+.def { color: var(--faint); }
+
+/* ---- widgets ---- */
+input[type=number], input[type=text], select {
+  /* IBM 3270, not the segmented face: a field you type into wants to be
+     legible, and the segments are a readout idiom (they also did not render
+     in the browser, which is exactly what a fallback should be caught for) */
+  font-family: 'IBM3270', monospace;
+  font-size: 15px;
+  background: #050805;
+  color: var(--cyan);
+  border: 1px solid var(--dim);
+  padding: .35rem .5rem;
+  width: 100%;
+  border-radius: 0;
+}
+input[type=text] { font-size: 14px; color: var(--green); }
+input:focus, select:focus { outline: 0; border-color: var(--green); color: #fff; }
+input[type=checkbox] { appearance: none; width: 20px; height: 20px; border: 1px solid var(--dim); background: #050805; position: relative; margin: 0; cursor: pointer; }
+input[type=checkbox]:checked::after { content: 'X'; position: absolute; inset: 0; color: var(--green); text-align: center; line-height: 18px; font-family: 'IBM3270', monospace; }
+.tog { display: flex; align-items: center; gap: .6rem; color: var(--dim); font-size: 13px; }
+
+/* ---- actions ---- */
+.actions {
+  display: flex; align-items: center; gap: 1rem;
+  border: 1px solid var(--faint); padding: .8rem .9rem;
+  position: sticky; bottom: 0; background: var(--bg);
+}
+.btn {
+  font-family: 'IBM3270', monospace; font-size: 15px;
+  letter-spacing: .13em; text-transform: uppercase;
+  background: #050805; color: var(--green);
+  border: 1px solid var(--dim); padding: .45rem 1.3rem; cursor: pointer;
+}
+.btn:hover { border-color: var(--green); color: #fff; }
+
+/* ---- feedback ---- */
+.flash { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.flash.ok  { color: var(--green); }
+.flash.err { color: var(--red); }
+.flash ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+.note { color: var(--dim); font-size: 13px; }
+
+/* match the scrollbar to the machine rather than the OS */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: #050805; border-left: 1px solid var(--faint); }
+::-webkit-scrollbar-thumb { background: var(--faint); border: 1px solid var(--dim); }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }

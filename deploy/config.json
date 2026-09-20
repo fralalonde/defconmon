@@ -1,0 +1,11 @@
+{
+  "defcon.pulse_rate": 0.9,
+  "display.dwell": 20,
+  "display.fps": 15,
+  "display.screens": "wopr,defcon,radar,telemetry,vectrex",
+  "hud.visible": true,
+  "radar.sweep_rpm": 8.6,
+  "telemetry.full_scale": 100,
+  "vectrex.spin": 100,
+  "wopr.log_rows": 14
+}

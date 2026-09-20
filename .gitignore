@@ -1,0 +1,4 @@
+target/
+target-debian/
+.idea/
+*.ppm
