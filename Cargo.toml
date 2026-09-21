@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# CLI: clap 4, derive API, subcommands. `default-features = false` plus only
+# the features we use keeps the binary lean - no `color` (the help text is
+# plain), no `cargo`/`env`. std/help/usage/error-context are the base; derive
+# is the attribute API every binary here uses; suggestions adds "did you
+# mean ...?" typos near-free.
+clap = { version = "4", default-features = false, features = ["std", "help", "usage", "error-context", "derive", "suggestions"] }
 tiny-skia = "0.11"
 ab_glyph = "0.2"
 serde_json = "1"

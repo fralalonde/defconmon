@@ -66,8 +66,8 @@ for i in "${!SCREENS[@]}"; do
     for f in $(seq 0 $((N_FRAMES - 1))); do
         # t advances linearly from 0 to span across the screen's N_FRAMES.
         t=$(awk "BEGIN{printf \"%.3f\", ${f} * ${span} / ${N_FRAMES}}")
-        "$BIN" --w "$RW" --h "$RH" --t "$t" --screen "$sc" \
-            --feed "$FEED" --out "$SCRATCH/frames/$(printf '%05d' "$k").png" \
+        "$BIN" preview --screen "$sc" --out "$SCRATCH/frames/$(printf '%05d' "$k").png" \
+            --w "$RW" --h "$RH" --t "$t" --feed "$FEED" \
             >/dev/null
         k=$((k + 1))
     done

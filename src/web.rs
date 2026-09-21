@@ -1,6 +1,6 @@
 //! Config server: std-only HTTP + htmx.
 //!
-//! A separate process (`defconmon --serve PORT`) behind the `web` feature, so
+//! A separate process (`defconmon-config --serve PORT`) behind the `web` feature, so
 //! the display binary carries none of it. No framework, no new dependencies:
 //! std::net::TcpListener and a hand-rolled HTTP/1.1 response. htmx is vendored
 //! into the binary, so the page works with no internet access either.

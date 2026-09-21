@@ -52,8 +52,6 @@ pub struct Canvas {
     seed: u32,
     /// static CRT mask (scanlines x vignette), one byte per device pixel
     keep: Vec<u8>,
-    /// exact 8-bit multiply table: mul[(a << 8) | b] == a * b / 255
-    mul: Vec<u8>,
 }
 
 // The drawing API is deliberately positional (x, y, size, colour, alpha) to
@@ -76,7 +74,6 @@ impl Canvas {
             scale,
             seed: 0x1234_5678,
             keep: Vec::new(),
-            mul: Vec::new(),
         }
     }
 
@@ -278,7 +275,9 @@ impl Canvas {
     // shader cost more than all five screens' content put together, and every
     // frame they produced the identical result. So the static part is baked
     // into one byte-per-pixel mask at startup, and the per-frame cost collapses
-    // to a single linear pass with a table multiply.
+    // to a single linear pass. The pass is a "multiply by this/255": each piece
+    // is folded with the exact-division identity in `mul255` (below), which is
+    // branchless shifter math that LLVM auto-vectorises - no gather table.
 
     /// Build the static mask: scanlines x vignette, "multiply by this/255".
     fn prep_crt(&mut self) {
@@ -287,10 +286,6 @@ impl Canvas {
         }
         let (dw, dh) = (self.pm.width(), self.pm.height());
         let (dwu, dhu) = (dw as usize, dh as usize);
-
-        self.mul = (0..256 * 256)
-            .map(|i| ((i & 0xff) * ((i >> 8) & 0xff) / 255) as u8)
-            .collect();
 
         // scanline coverage per device row, replicating 1px fills at y = k*step
         // (partial overlaps accumulate, exactly as the vector version did)
@@ -330,27 +325,28 @@ impl Canvas {
     }
 
     /// Scanlines + vignette + flicker in one pass.
+    ///
+    /// Branchless by design. Every pixel gets the *same* folding: fold the
+    /// static mask by the flicker wobble, then darken each channel by that.
+    /// There is deliberately no `if k == 255 { continue }` shortcut: a
+    /// data-dependent branch forces LLVM to scalarise the loop (and dropping it
+    /// costs nothing, because the k==255 "skip" is exactly what the arithmetic
+    /// does anyway - (p * 255 / 255) == p). The result is a straight load /
+    /// widen / multiply / narrow stream that compiles to one tight SIMD pass.
     fn apply_darken(&mut self, flicker: u8) {
-        let n = (self.pm.width() * self.pm.height()) as usize;
-        let fm = 255u32 - flicker as u32;
-        // the wobble is global, so fold it in via a 256-entry table, not per pixel
-        let mut scale = [0u8; 256];
-        for (k, sv) in scale.iter_mut().enumerate() {
-            *sv = ((k as u32 * fm) / 255) as u8;
-        }
+        // flicker is global, so it is folded into the mask as a second multiply
+        let fm = 255u16 - flicker as u16;
         let keep = &self.keep;
-        let mul = &self.mul;
         let data = self.pm.data_mut();
-        for i in 0..n {
-            let k = scale[keep[i] as usize] as usize;
-            if k == 255 {
-                continue; // unaffected: the middle of the tube, between scanlines
-            }
+        // iterate over the mask bytes (`needless_range_loop` would flag a
+        // `for i in 0..n` that indexes `keep`), while `base = i*4` lets the
+        // 3-of-4-byte RGBA stride stay visible to the vectoriser.
+        for (i, &mk) in keep.iter().enumerate() {
             let base = i * 4;
-            let kk = k << 8;
-            data[base] = mul[kk | data[base] as usize];
-            data[base + 1] = mul[kk | data[base + 1] as usize];
-            data[base + 2] = mul[kk | data[base + 2] as usize];
+            let k = mul255(mk, fm as u8);
+            data[base] = mul255(data[base], k);
+            data[base + 1] = mul255(data[base + 1], k);
+            data[base + 2] = mul255(data[base + 2], k);
         }
     }
 
@@ -367,7 +363,7 @@ impl Canvas {
                 (self.rnd() * dh as f32) as u32,
             ));
         }
-        let mul = &self.mul;
+        let keep_a = 255u8 - a; // keep = blend this much of the existing pixel
         let data = self.pm.data_mut();
         for (x, y) in pts {
             for (ox, oy) in [(0u32, 0u32), (1, 0), (0, 1), (1, 1)] {
@@ -376,11 +372,9 @@ impl Canvas {
                     continue;
                 }
                 let i = ((yy * dw + xx) as usize) * 4;
-                let kk = (255 - a as usize) << 8;
-                let put = (a as usize) << 8;
-                data[i] = mul[kk | data[i] as usize].saturating_add(mul[put | cr as usize]);
-                data[i + 1] = mul[kk | data[i + 1] as usize].saturating_add(mul[put | cg as usize]);
-                data[i + 2] = mul[kk | data[i + 2] as usize].saturating_add(mul[put | cb as usize]);
+                data[i] = mul255(data[i], keep_a).saturating_add(mul255(cr, a));
+                data[i + 1] = mul255(data[i + 1], keep_a).saturating_add(mul255(cg, a));
+                data[i + 2] = mul255(data[i + 2], keep_a).saturating_add(mul255(cb, a));
             }
         }
     }
@@ -413,6 +407,20 @@ impl Canvas {
         }
     }
 
+}
+
+/// Exact `(a * b) / 255`, truncated, for two 8-bit factors.
+///
+/// `a*b <= 255*255 = 65025`, and for every t < 65535 the shifter identity
+/// `((t + 1 + (t >> 8)) >> 8) == t / 255` holds exactly. Written this way - a
+/// multiply plus two shifts and an add - it is expression-shape pure code with
+/// no table and no division, so LLVM can vectorise the loops that call it
+/// (a per-pixel gather table could not be). Kept `#[inline(always)]` so it
+/// never forms a call barrier between the loads and the stores.
+#[inline(always)]
+fn mul255(a: u8, b: u8) -> u8 {
+    let t = (a as u16) * (b as u16);
+    ((t + 1 + (t >> 8)) >> 8) as u8
 }
 
 fn stroke(lw: f32) -> Stroke {

@@ -47,6 +47,27 @@ Rendering pipeline:
   and the CRT finish; the fonts and vector art **always** rasterise on the CPU.
   The look survives with the GPU off.
 
+## Command line
+
+`defconmon` is a subcommand CLI (clap). `--config` is a **global** option, accepted
+before or after a subcommand, and always defaults to `/etc/defconmon/config.json`.
+
+```sh
+defconmon --config /etc/defconmon/config.json      # live display (no subcommand)
+defconmon [--config P] list                        # registered screens
+defconmon [--config P] params                      # every setting (key, kind, default)
+defconmon [--config P] preview --screen wopr --out frame.png \
+        [--w 1920 --h 1080] [--t 0] [--feed path]  # headless one-frame render
+defconmon [--config P] bench 30 [--scale 0.5]      # ms/frame against the CPU budget
+defconmon [--config P] service install [--dry-run] # write + enable systemd units
+defconmon [--config P] service remove  [--dry-run] # stop, disable, delete units
+defconmon-config --config P --serve 8080           # the config web server (separate binary)
+```
+
+The no-subcommand form is the one the deployed box uses (`defconmon --config
+/etc/defconmon/config.json` under `cage`); the old `--list` / `--params` /
+`--bench` / `--screen` / `--out` flags moved to the subcommands above.
+
 ## Run / deploy
 
 Display runs under cage (Wayland) on the compositor's HDMI output via the stock
@@ -58,6 +79,16 @@ unit, so tuning needs no restart.
 |---|---|
 | `dashboard.service` + `dashboard.service.d/defconmon.conf` | `cage -- /usr/local/bin/defconmon --config /etc/defconmon/config.json` |
 | `defconmon-config.service` | `/usr/local/bin/defconmon-config --config /etc/defconmon/config.json --serve 8080` |
+
+For a stock install (no existing `dashboard.service` binding), `defconmon
+service install` writes generic, public-safe units at
+`/etc/systemd/system/defconmon.service` (+ `defconmon-config.service` when the
+config-server binary sits beside the display) and runs `systemctl daemon-reload`
+and `systemctl enable --now` on them. It wraps the display in `cage` when `cage`
+is on `PATH`, else runs the binary directly, and prints every path it writes and
+every command it runs. `service remove` stops/disables and deletes the units but
+never touches the config file or the binaries. Both accept `--dry-run` to show
+what would change without touching the system (and work without root).
 
 ## Config
 

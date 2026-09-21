@@ -31,10 +31,14 @@ Assume a **cheap old GPU — possibly ARM/Mali; never assume a vendor, a
 desktop-class part, or anything newer than ~2010**. Nothing user-visible may
 depend on the GPU.
 
-CPU ISA is not the constraint: SIMD is available and permitted (AVX2 and NEON
-are assumed present). Don't go out of your way to use it; don't work around it
-either. If it is ever used, gate it on runtime feature detection rather than a
-`target-cpu` pin, so one binary still runs on the old boxes.
+CPU ISA baseline (`~/.cargo` config, x86-64 only): **x86-64-v3** (AVX2/FMA/BMI2,
+the Haswell-2013 class = the ~2015 cutoff). Anything below that is out of
+scope. This is why the CRT pass is branchless arithmetic - each piece is a
+`(a*b)/255` via the exact shifter identity, which auto-vectorises with AVX2 into
+one tight SIMD pass (a per-pixel gather table could not). aarch64 needs no pin:
+NEON is already the baseline, so the same source vectorises there untouched.
+One binary per target plays the real box; features are not filtered at runtime,
+only the ISA the binary is built against.
 
 ## Design rule
 
@@ -70,16 +74,18 @@ volume carrying the toolchain.
 ## Measuring
 
 ```sh
-./defconmon --bench 40 --screen radar --scale 0.5   # ms/frame for one screen
-./defconmon --list                                 # screen registry
-./defconmon --params                               # full schema
-./defconmon --screen wopr --t 7.3 --out wopr.png   # headless frame
-./defconmon --feed examples/sample-feed.json --screen defcon --out defcon.png
+./defconmon bench 40 --scale 0.5                    # ms/frame, every screen
+./defconmon list                                    # screen registry
+./defconmon params                                  # full schema
+./defconmon preview --screen wopr --t 7.3 --out wopr.png     # headless frame
+./defconmon preview --feed examples/sample-feed.json \
+    --screen defcon --out defcon.png
 ```
 
-`--t SECONDS` is the scene clock, so any frame of the animation can be
-inspected. `--feed PATH` renders from a feed JSON instead of the live one; pass
-`--feed examples/sample-feed.json` to draw previews from the bundled sample
-data (works off-box, no live feed required). Without `--feed`, the live feed is
-read from `/run/dashboard/dashboard.json` (falling back to `./dashboard.json`).
+`preview --t SECONDS` is the scene clock, so any frame of the animation can be
+inspected. `preview --feed PATH` renders from a feed JSON instead of the live
+one; pass `--feed examples/sample-feed.json` to draw previews from the bundled
+sample data (works off-box, no live feed required). Without `--feed`, the live
+feed is read from `/run/dashboard/dashboard.json` (falling back to
+`./dashboard.json`).
 Stop the live service before benchmarking — single-core container.

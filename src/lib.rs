@@ -17,32 +17,16 @@ pub mod fonts;
 pub mod gpu;
 pub mod live;
 pub mod screens;
+pub mod service;
 #[cfg(feature = "web")]
 pub mod web;
 
 // Version contract: `DEFCONMON_VERSION` is stamped by build.rs when present;
 // falling back to CARGO_PKG_VERSION means the binary reports a sane version even
 // before build.rs has run (or if it is ever removed). A plain fn, not a const:
-// `Option::unwrap_or` is not const-stable.
+// `Option::unwrap_or` is not const-stable. clap reads this via
+// `Cli::command().version(defconmon::version())` so `--version` always prints
+// the injected value.
 pub fn version() -> &'static str {
     option_env!("DEFCONMON_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
-}
-
-/// Find the value that follows `k` in `args` (e.g. `--config path`).
-pub fn arg(args: &[String], k: &str) -> Option<String> {
-    args.iter().position(|a| a == k).and_then(|i| args.get(i + 1)).cloned()
-}
-
-/// Handle `--help`/`--version`; returns true when one was consumed so main
-/// can bail out before touching a config file. Shared by both binaries.
-pub fn handle_introspect(args: &[String], usage: &str) -> bool {
-    if args.iter().any(|a| a == "--version" || a == "-V") {
-        println!("defconmon {}", version());
-        return true;
-    }
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("{usage}");
-        return true;
-    }
-    false
 }
