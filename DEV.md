@@ -28,9 +28,13 @@ TeraScale 2, Mesa r600 GL backend:
 ## Portability rule
 
 Assume a **cheap old GPU — possibly ARM/Mali; never assume a vendor, a
-desktop-class part, or anything newer than ~2010**. The CPU path is pure Rust,
-no `cfg(target_arch)`, no SIMD intrinsics — it runs anywhere. Nothing
-user-visible may depend on the GPU.
+desktop-class part, or anything newer than ~2010**. Nothing user-visible may
+depend on the GPU.
+
+CPU ISA is not the constraint: SIMD is available and permitted (AVX2 and NEON
+are assumed present). Don't go out of your way to use it; don't work around it
+either. If it is ever used, gate it on runtime feature detection rather than a
+`target-cpu` pin, so one binary still runs on the old boxes.
 
 ## Design rule
 
